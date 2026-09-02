@@ -17,21 +17,16 @@ class CloseExpiredAuctions extends Command
      */
     protected $description = 'Tutup lelang yang sudah melewati waktu berakhir dan tentukan pemenang';
 
-    public function handle(): void
+    public function handle(CloseAuctionAction $closeAuction): void
     {
         $expired = Listing::where('status', 'active')
             ->where('auction_end', '<=', now())
             ->get();
 
         foreach ($expired as $listing) {
-            // Ubah status lelang
-            $listing->update(['status' => 'ended']);
-
-            $winnerName = $listing->current_winner_id && $listing->currentWinner 
-                ? $listing->currentWinner->name 
-                : 'Tidak ada bid';
-
-            $this->info("Listing #{$listing->id} ditutup. Pemenang: {$winnerName}");
+            $closeAuction->execute($listing);
+            $this->info("Listing #{$listing->id} ditutup. Pemenang: " .
+                ($listing->current_winner_id ? $listing->currentWinner->name : 'Tidak ada bid'));
         }
 
         $this->info("Total {$expired->count()} lelang ditutup.");

@@ -61,4 +61,9 @@ class Listing extends Model
     {
         return $this->bids()->orderByDesc('amount')->first();
     }
+
+    public function isCurrentlyActive(): bool
+    {
+        return $this->status === 'active' && $this->auction_end->isFuture();
+    }
 }
