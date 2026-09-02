@@ -1,7 +1,11 @@
 <?php
 
+use App\Console\Commands\CloseExpiredAuctions;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command(CloseExpiredAuctions::class)->everyMinute();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

@@ -15,7 +15,7 @@ Aplikasi lelang sederhana dengan kategori listing dinamis.
 | Laravel Breeze (Livewire — Volt Class API) | Scaffolding autentikasi |
 | Livewire + Volt | Komponen interaktif tanpa AJAX/JS manual |
 | Pest | Testing framework |
-| Laravel Reverb | WebSocket server self-hosted untuk real-time broadcasting |
+| Laravel Reverb | WebSocket server self-hosted untuk real-time broadcasting 
 | Vite | Compile asset CSS (Tailwind) & JS (Alpine.js, Echo) |
 
 ---
@@ -35,7 +35,7 @@ php artisan key:generate
 # 3. Migrate & seed
 php artisan migrate:fresh --seed
 
-# 4. Jalankan
+# 4. Jalankan (butuh 3 proses berjalan bersamaan)
 php artisan serve
 php artisan reverb:start
 npm run dev
@@ -105,3 +105,43 @@ Laravel Reverb memiliki dukungan queue database secara native, sehingga fitur re
 
 ---
 
+## Sistem Lelang & Bidding
+
+### Alur kerja
+1. Setiap listing otomatis menjadi sesi lelang saat dibuat, dengan `auction_start` = waktu pembuatan dan `auction_end` = waktu pembuatan + durasi yang ditentukan seller.
+2. Logika validasi & eksekusi bid dipisahkan ke `app/Actions/PlaceBidAction.php` (bukan ditulis langsung di Livewire component), supaya:
+   - Bisa di-unit test tanpa perlu render component.
+   - Livewire component tetap fokus ke urusan UI saja.
+3. Setiap bid masuk dibungkus dalam `DB::transaction()` dengan `lockForUpdate()` pada row listing — mencegah **race condition** ketika dua bid diajukan hampir bersamaan (mencegah dua bid "menang" di waktu yang sama karena keduanya membaca harga lama sebelum salah satu ter-update).
+4. Aturan kenaikan minimum bid: **+5% dari harga saat ini** (dapat diubah di `PlaceBidAction::MIN_INCREMENT_PERCENT`). Nilai persentase dipilih (bukan nominal tetap) agar tetap proporsional baik untuk listing harga rendah maupun tinggi.
+5. Validasi yang dijalankan sebelum bid diterima:
+   - Lelang masih `active` dan belum melewati `auction_end`.
+   - Bidder bukan pemilik listing (`user_id` seller ≠ bidder — mencegah self-bid).
+   - Nominal bid ≥ harga saat ini + 5%.
+6. Setiap bid valid memicu event `NewBidPlaced` (broadcast lewat Reverb) ke channel publik `listing.{id}`, sehingga siapa pun yang sedang membuka halaman detail listing tersebut menerima update harga secara real-time tanpa refresh.
+
+### Auto-close lelang (`app/Console/Commands/CloseExpiredAuctions.php`)
+Command `auctions:close-expired` men-scan seluruh listing berstatus `active` yang `auction_end`-nya sudah lewat, lalu mengubah statusnya menjadi `ended`. Pemenang **tidak dihitung ulang** di sini — nilai `current_winner_id` sudah terkunci secara otomatis dari bid tertinggi terakhir yang tercatat oleh `PlaceBidAction`, sehingga command ini murni bertugas mengunci status saja.
+
+Command ini didaftarkan untuk berjalan otomatis setiap menit lewat scheduler (`routes/console.php`), dan saat development scheduler dijalankan lewat:
+```bash
+php artisan schedule:work
+```
+
+### Testing manual mempercepat waktu lelang (untuk demo/skenario uji)
+Karena durasi lelang bisa mencapai belasan menit, untuk keperluan demo/testing lebih cepat digunakan `php artisan tinker` (REPL interaktif bawaan Laravel) untuk memundurkan `auction_end` secara manual tanpa perlu menunggu waktu asli habis:
+```bash
+php artisan tinker
+```
+```php
+$listing = \App\Models\Listing::first();
+$listing->update(['auction_end' => now()->subMinute()]);
+exit
+```
+Lalu jalankan command penutup lelang secara manual (tanpa menunggu giliran scheduler):
+```bash
+php artisan auctions:close-expired
+```
+Tinker dan pemanggilan manual command ini murni alat bantu development/testing — tidak digunakan oleh alur aplikasi yang sebenarnya (di production, command berjalan otomatis lewat scheduler).
+
+---

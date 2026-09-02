@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Livewire\Volt\Volt;
 
 Route::view('/', 'welcome');
 
@@ -11,5 +12,14 @@ Route::view('dashboard', 'dashboard')
 Route::view('profile', 'profile')
     ->middleware(['auth'])
     ->name('profile');
+
+// Route statis didaftarkan LEBIH DULU
+Volt::route('/listings/create', 'listings.create')->name('listings.create')->middleware('auth');
+
+Volt::route('/my-auctions', 'my-auctions')->name('my-auctions')->middleware('auth');
+
+// Route dinamis didaftarkan SETELAH yang statis
+Volt::route('/listings', 'listings.index')->name('listings.index');
+Volt::route('/listings/{listing}', 'listings.detail')->name('listings.detail');
 
 require __DIR__.'/auth.php';
