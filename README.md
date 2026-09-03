@@ -2,7 +2,7 @@
 
 Aplikasi lelang sederhana dengan kategori listing dinamis.
 
-> **Status:** Work in progress.
+> **Status:** Selesai - seluruh fitur wajib (2.1–2.4) dan bonus (2.5: real-time update, validasi anti self-bid, unit test) sudah diimplementasikan.
 
 ---
 
@@ -14,9 +14,10 @@ Aplikasi lelang sederhana dengan kategori listing dinamis.
 | MySQL | Database |
 | Laravel Breeze (Livewire — Volt Class API) | Scaffolding autentikasi |
 | Livewire + Volt | Komponen interaktif tanpa AJAX/JS manual |
+| Alpine.js | Countdown waktu lelang live di sisi client |
 | Pest | Testing framework |
-| Laravel Reverb | WebSocket server self-hosted untuk real-time broadcasting 
-| Vite | Compile asset CSS (Tailwind) & JS (Alpine.js, Echo) |
+| Laravel Reverb | WebSocket server self-hosted untuk real-time broadcasting |
+| Vite + Tailwind CSS | Compile asset & styling |
 
 ---
 
@@ -32,13 +33,17 @@ cp .env.example .env
 php artisan key:generate
 # lalu isi kredensial database MySQL di .env
 
-# 3. Migrate & seed
+# 3. Buat symbolic link storage (untuk foto listing)
+php artisan storage:link
+
+# 4. Migrate & seed
 php artisan migrate:fresh --seed
 
-# 4. Jalankan (butuh 3 proses berjalan bersamaan)
+# 5. Jalankan (butuh 4 proses berjalan bersamaan, tiap proses di terminal terpisah)
 php artisan serve
 php artisan reverb:start
 npm run dev
+php artisan schedule:work
 ```
 
 Akun percobaan (dari seeder), semua pakai password `password`:
@@ -62,12 +67,12 @@ Akun percobaan (dari seeder), semua pakai password `password`:
 | `user_id` (FK, cascade delete) | Seller/pemilik listing. Cascade karena listing tidak punya arti tanpa pemiliknya |
 | `category_id` (FK) | Menentukan field dinamis mana yang berlaku pada `specs` |
 | `specs` (JSON) | Field spesifikasi dinamis sesuai kategori (lihat penjelasan di bawah) |
-| `photo_path` | Foto listing (upload lokal atau URL) |
+| `photo_path` | Path foto listing, disimpan lewat upload file lokal (`storage/app/public/listings`) |
 | `starting_price` | Harga awal, tetap sebagai acuan, tidak berubah selama lelang berjalan |
 | `current_price` | Harga tertinggi saat ini, di-update tiap ada bid valid — menghindari query `MAX()` ke tabel `bids` tiap kali halaman list diakses |
 | `current_winner_id` (FK, nullable) | Bidder dengan bid tertinggi saat ini, dikunci saat status berubah jadi `ended` |
 | `auction_start` / `auction_end` | Waktu mulai/berakhir lelang, dasar perhitungan "waktu tersisa" dan trigger auto-close |
-| `status` (enum: `active`, `ended`) | Status lelang saat ini |
+| `status` (enum: `active`, `ended`) | Status lelang. Nilai kolom ini bisa sedikit "telat" dari kondisi aslinya (lihat bagian Auto-close di bawah) — status aktual selalu dihitung lewat method `isCurrentlyActive()` pada model, bukan dibaca mentah dari kolom ini |
 
 ### `bids`
 | Kolom | Alasan |
@@ -93,7 +98,7 @@ Satu akun dapat berperan sebagai **seller maupun bidder** tanpa sistem role terp
 | EAV (tabel key-value) | Query jadi kompleks (butuh banyak JOIN untuk menampilkan satu listing), overkill untuk kasus 2 kategori dengan field terbatas |
 | **JSON (dipilih)** | Satu kolom, fleksibel menampung struktur berbeda per kategori, cepat diimplementasikan. MySQL mendukung tipe `JSON` secara native, dan Eloquent memiliki cast bawaan (`'specs' => 'array'`) sehingga tetap ditangani sebagai array PHP biasa di level aplikasi |
 
-Validasi struktur field per kategori dilakukan di **level aplikasi** (Livewire component), bukan di level database, karena MySQL JSON tidak melakukan enforce skema internal.
+Validasi struktur field per kategori dilakukan di **level aplikasi**, bukan di level database, karena MySQL JSON tidak melakukan enforce skema internal. Definisi field per kategori (label, tipe input, aturan validasi) disentralisasi di `config/listing_categories.php`, sehingga menambah/mengubah field spesifikasi cukup dilakukan di file config ini tanpa menyentuh kode Livewire component sama sekali.
 
 Sementara tabel `bids` tetap dirancang relasional biasa (bukan JSON) karena strukturnya seragam di setiap baris dan membutuhkan query agregat yang efisien (`MAX`, `ORDER BY`, `COUNT`) untuk riwayat bid dan penentuan pemenang.
 
@@ -115,13 +120,20 @@ Laravel Reverb memiliki dukungan queue database secara native, sehingga fitur re
 3. Setiap bid masuk dibungkus dalam `DB::transaction()` dengan `lockForUpdate()` pada row listing — mencegah **race condition** ketika dua bid diajukan hampir bersamaan (mencegah dua bid "menang" di waktu yang sama karena keduanya membaca harga lama sebelum salah satu ter-update).
 4. Aturan kenaikan minimum bid: **+5% dari harga saat ini** (dapat diubah di `PlaceBidAction::MIN_INCREMENT_PERCENT`). Nilai persentase dipilih (bukan nominal tetap) agar tetap proporsional baik untuk listing harga rendah maupun tinggi.
 5. Validasi yang dijalankan sebelum bid diterima:
-   - Lelang masih `active` dan belum melewati `auction_end`.
+   - Lelang masih aktif (dicek lewat `isCurrentlyActive()`, bukan kolom `status` mentah).
    - Bidder bukan pemilik listing (`user_id` seller ≠ bidder — mencegah self-bid).
    - Nominal bid ≥ harga saat ini + 5%.
 6. Setiap bid valid memicu event `NewBidPlaced` (broadcast lewat Reverb) ke channel publik `listing.{id}`, sehingga siapa pun yang sedang membuka halaman detail listing tersebut menerima update harga secara real-time tanpa refresh.
 
+### Status lelang & waktu real-time (tanpa refresh manual)
+Kolom `status` di database bisa saja belum ter-update tepat saat waktu habis (baru berubah saat command auto-close dijalankan). Untuk menghindari tampilan yang keliru, ditambahkan dua lapis penanganan:
+
+1. **Method `isCurrentlyActive()`** pada model `Listing` — mengecek `status === 'active'` **dan** `auction_end` belum lewat. Seluruh tampilan (index, detail, my-auctions) memakai method ini, bukan membaca kolom `status` secara langsung.
+2. **Lazy-close saat listing dibuka** — di `mount()` pada halaman detail, jika ditemukan listing yang waktunya sudah lewat tapi statusnya masih `active`, langsung ditutup saat itu juga lewat `CloseAuctionAction`, tanpa menunggu giliran scheduler.
+3. **Countdown live di sisi client** — memakai Alpine.js (`x-data`, `setInterval` tiap 1 detik) yang menghitung mundur berdasarkan timestamp `auction_end`. Begitu mencapai nol, otomatis memicu `$wire.refreshListing()` (di detail) atau `$wire.$refresh()` (di index/my-auctions) untuk menyinkronkan status dari server, tanpa perlu polling berkala (`wire:poll`) karena update terjadi tepat saat waktunya habis.
+
 ### Auto-close lelang (`app/Console/Commands/CloseExpiredAuctions.php`)
-Command `auctions:close-expired` men-scan seluruh listing berstatus `active` yang `auction_end`-nya sudah lewat, lalu mengubah statusnya menjadi `ended`. Pemenang **tidak dihitung ulang** di sini — nilai `current_winner_id` sudah terkunci secara otomatis dari bid tertinggi terakhir yang tercatat oleh `PlaceBidAction`, sehingga command ini murni bertugas mengunci status saja.
+Command `auctions:close-expired` men-scan seluruh listing berstatus `active` yang `auction_end`-nya sudah lewat, lalu mengubah statusnya menjadi `ended` lewat `app/Actions/CloseAuctionAction.php` (logic yang sama juga dipakai untuk lazy-close di atas, agar tidak ada duplikasi logic). Pemenang **tidak dihitung ulang** di sini — nilai `current_winner_id` sudah terkunci secara otomatis dari bid tertinggi terakhir yang tercatat oleh `PlaceBidAction`.
 
 Command ini didaftarkan untuk berjalan otomatis setiap menit lewat scheduler (`routes/console.php`), dan saat development scheduler dijalankan lewat:
 ```bash
@@ -145,3 +157,39 @@ php artisan auctions:close-expired
 Tinker dan pemanggilan manual command ini murni alat bantu development/testing — tidak digunakan oleh alur aplikasi yang sebenarnya (di production, command berjalan otomatis lewat scheduler).
 
 ---
+
+## Dashboard
+
+- **`/listings`** — daftar seluruh listing dengan filter kategori.
+- **`/listings/{id}`** — detail listing: spesifikasi sesuai kategori, harga saat ini, sisa waktu (live), riwayat bid, form pengajuan bid.
+- **`/my-auctions`** — daftar listing milik user yang sedang login beserta status masing-masing.
+- **`/`** — landing page.
+
+---
+
+## Upload Foto
+Foto listing disimpan sebagai file lokal (bukan input URL) memakai `Livewire\WithFileUploads`, tersimpan di disk `public` (`storage/app/public/listings`) dan diakses lewat symbolic link (`php artisan storage:link`). Preview foto ditampilkan sebelum listing disimpan lewat `temporaryUrl()` bawaan Livewire.
+
+---
+
+## Testing
+
+Unit test untuk `PlaceBidAction` (`tests/Unit/PlaceBidActionTest.php`) mencakup:
+- Bid valid berhasil diterima dan mengubah `current_price` serta `current_winner_id`.
+- Bid ditolak jika kenaikannya kurang dari minimum 5%.
+- Bid ditolak jika lelang sudah berakhir.
+- Bid ditolak jika diajukan oleh pemilik listing sendiri.
+- Bid baru menggantikan `current_winner_id` dari bid sebelumnya.
+
+Jalankan seluruh test:
+```bash
+php artisan test
+```
+
+---
+
+## Asumsi
+- Durasi lelang ditentukan bebas oleh seller saat membuat listing.
+- Kenaikan minimum bid ditetapkan 5% dari harga saat ini (bukan nominal tetap), agar proporsional di berbagai rentang harga.
+- Verifikasi email tidak diaktifkan, sesuai ketentuan soal.
+- Satu akun bisa berperan sebagai seller maupun bidder tanpa sistem role terpisah.
