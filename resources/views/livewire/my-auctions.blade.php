@@ -24,7 +24,7 @@ new class extends Component {
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
             </svg>
-            <span>Buat Listing Baru</span>
+            <span>Buat Lelang Baru</span>
         </a>
     </div>
 
@@ -40,9 +40,9 @@ new class extends Component {
             <div class="relative w-full h-52 bg-gray-100 overflow-hidden">
                 @if ($listing->photo_path && Storage::disk('public')->exists($listing->photo_path))
                     <img src="{{ Storage::url($listing->photo_path) }}" 
-                         alt="{{ $listing->title }}" 
-                         onerror="this.onerror=null; this.remove(); this.nextElementSibling.classList.remove('hidden');"
-                         class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                        alt="{{ $listing->title }}" 
+                        onerror="this.onerror=null; this.remove(); this.nextElementSibling.classList.remove('hidden');"
+                        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
                     
                     {{-- Hidden Placeholder Fallback (Triggered by JS OnError) --}}
                     <div class="hidden w-full h-full flex-col items-center justify-center bg-gray-100 text-gray-400">
@@ -81,6 +81,44 @@ new class extends Component {
                         </span>
                     @endif
                 </div>
+
+                {{-- FLOATING COUNTDOWN BAR (Sisa Waktu Lelang) --}}
+                @if ($listing->isCurrentlyActive())
+                    <div class="absolute bottom-2 inset-x-2 z-10">
+                        <div wire:key="my-auction-countdown-{{ $listing->id }}"
+                            x-data="{
+                                endsAt: {{ $listing->auction_end->timestamp }} * 1000,
+                                remaining: '',
+                                expired: false,
+                                tick() {
+                                    let diff = this.endsAt - Date.now();
+                                    if (diff <= 0) {
+                                        this.remaining = 'Selesai';
+                                        if (!this.expired) {
+                                            this.expired = true;
+                                            $wire.$refresh();
+                                        }
+                                        return;
+                                    }
+                                    let h = Math.floor(diff / 3600000);
+                                    let m = Math.floor((diff % 3600000) / 60000);
+                                    let s = Math.floor((diff % 60000) / 1000);
+                                    this.remaining = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+                                }
+                            }"
+                            x-init="tick(); setInterval(() => tick(), 1000)"
+                            class="flex items-center justify-between px-3 py-1.5 rounded-xl bg-gray-900/80 backdrop-blur-md text-white text-xs shadow-md border border-white/10"
+                        >
+                            <span class="inline-flex items-center gap-1 text-[11px] text-gray-300 font-medium">
+                                <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                Sisa Waktu
+                            </span>
+                            <span class="font-mono font-bold tracking-wider text-amber-300 text-xs" x-text="remaining"></span>
+                        </div>
+                    </div>
+                @endif
             </div>
 
             {{-- Card Body --}}
@@ -110,8 +148,8 @@ new class extends Component {
                     </div>
 
                     <a href="{{ route('listings.detail', $listing) }}" 
-                       wire:navigate
-                       class="inline-flex items-center gap-1 text-sm font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">
+                    wire:navigate
+                    class="inline-flex items-center gap-1 text-sm font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">
                         Detail 
                         <svg class="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
@@ -140,7 +178,7 @@ new class extends Component {
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
-                <span>Buat Listing Baru</span>
+                <span>Buat Lelang Baru</span>
             </a>
         </div>
     @endforelse

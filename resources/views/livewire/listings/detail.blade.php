@@ -236,7 +236,7 @@ new class extends Component {
                         <form wire:submit="submitBid" class="space-y-4">
                             <div>
                                 <div class="flex justify-between items-center mb-1">
-                                    <label class="block text-xs font-bold text-gray-700">Nominal Bid Anda</label>
+                                    <label class="block text-xs font-bold text-gray-700">Nominal Harga Tawaran Anda</label>
                                     <span class="text-[11px] text-gray-400">Min. Rp {{ number_format($this->minimumBid, 0, ',', '.') }}</span>
                                 </div>
                                 <div class="relative rounded-xl shadow-sm">
@@ -277,7 +277,7 @@ new class extends Component {
                         </div>
                     @else
                         <div class="p-4 bg-gray-50 border border-gray-200/80 rounded-xl text-center">
-                            <p class="text-xs text-gray-500 italic">Ini adalah listing milik Anda sendiri (Pemilik tidak dapat melakukan bid).</p>
+                            <p class="text-xs text-gray-500 italic">Ini adalah Item Lelang milik Anda sendiri (Pemilik tidak dapat Mengajukan harga).</p>
                         </div>
                     @endif
                 @else

@@ -63,7 +63,7 @@ class PlaceBidAction
 
         if ($amount < $minimumAllowed) {
             throw new RuntimeException(
-                'Bid harus lebih tinggi minimal ' . self::MIN_INCREMENT_PERCENT . '% dari harga saat ini (minimal Rp' . number_format($minimumAllowed, 0, ',', '.') . ').'
+                'Harga Tawar harus lebih tinggi minimal ' . self::MIN_INCREMENT_PERCENT . '% dari harga saat ini (minimal Rp' . number_format($minimumAllowed, 0, ',', '.') . ').'
             );
         }
     }

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Action\CloseAuctionAction;
 use App\Models\Listing;
 use Illuminate\Console\Command;
 

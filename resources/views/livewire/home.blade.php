@@ -106,9 +106,18 @@ new class extends Component {
                     <div class="relative w-full h-52 bg-gray-100 overflow-hidden">
                         @if ($listing->photo_path && Storage::disk('public')->exists($listing->photo_path))
                             <img src="{{ asset('storage/' . $listing->photo_path) }}" 
-                                 alt="{{ $listing->title }}" 
-                                 loading="lazy"
-                                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                                alt="{{ $listing->title }}" 
+                                loading="lazy"
+                                onerror="this.onerror=null; this.remove(); this.nextElementSibling.classList.remove('hidden');"
+                                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            
+                            {{-- Hidden Placeholder Fallback (Triggered by JS OnError) --}}
+                            <div class="hidden w-full h-full flex flex-col items-center justify-center bg-gray-100 text-gray-400">
+                                <svg class="w-10 h-10 mb-1 stroke-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V7.5zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                                </svg>
+                                <span class="text-xs font-medium">Gambar Tidak Tersedia</span>
+                            </div>
                         @else
                             <div class="w-full h-full flex flex-col items-center justify-center bg-gray-100 text-gray-400">
                                 <svg class="w-10 h-10 mb-1 stroke-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,14 +127,14 @@ new class extends Component {
                             </div>
                         @endif
                         
-                        {{-- Category Badge --}}
+                        {{-- Category Badge (Top Left) --}}
                         <div class="absolute top-3 left-3 z-10">
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-white/90 backdrop-blur-md text-gray-800 shadow-sm border border-white/20">
                                 {{ $listing->category->name }}
                             </span>
                         </div>
 
-                        {{-- Status Badge --}}
+                        {{-- Status Badge (Top Right) --}}
                         <div class="absolute top-3 right-3 z-10">
                             @if ($listing->isCurrentlyActive())
                                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/90 backdrop-blur-md text-white shadow-sm">
@@ -138,6 +147,44 @@ new class extends Component {
                                 </span>
                             @endif
                         </div>
+
+                        {{-- FLOATING COUNTDOWN BAR (Sisa Waktu) --}}
+                        @if ($listing->isCurrentlyActive())
+                            <div class="absolute bottom-2 inset-x-2 z-10">
+                                <div wire:key="home-countdown-{{ $listing->id }}"
+                                    x-data="{
+                                        endsAt: {{ $listing->auction_end->timestamp }} * 1000,
+                                        remaining: '',
+                                        expired: false,
+                                        tick() {
+                                            let diff = this.endsAt - Date.now();
+                                            if (diff <= 0) {
+                                                this.remaining = 'Selesai';
+                                                if (!this.expired) {
+                                                    this.expired = true;
+                                                    $wire.$refresh();
+                                                }
+                                                return;
+                                            }
+                                            let h = Math.floor(diff / 3600000);
+                                            let m = Math.floor((diff % 3600000) / 60000);
+                                            let s = Math.floor((diff % 60000) / 1000);
+                                            this.remaining = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+                                        }
+                                    }"
+                                    x-init="tick(); setInterval(() => tick(), 1000)"
+                                    class="flex items-center justify-between px-3 py-1.5 rounded-xl bg-gray-900/80 backdrop-blur-md text-white text-xs shadow-md border border-white/10"
+                                >
+                                    <span class="inline-flex items-center gap-1 text-[11px] text-gray-300 font-medium">
+                                        <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Sisa Waktu
+                                    </span>
+                                    <span class="font-mono font-bold tracking-wider text-amber-300 text-xs" x-text="remaining"></span>
+                                </div>
+                            </div>
+                        @endif
                     </div>
 
                     {{-- Card Body --}}
@@ -171,8 +218,8 @@ new class extends Component {
                             </div>
 
                             <a href="{{ route('listings.detail', $listing) }}" 
-                               wire:navigate
-                               class="inline-flex items-center gap-1 text-sm font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">
+                            wire:navigate
+                            class="inline-flex items-center gap-1 text-sm font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">
                                 Detail 
                                 <svg class="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
@@ -192,8 +239,8 @@ new class extends Component {
                     <p class="text-sm text-gray-500 mb-6">Jadilah yang pertama melelang satwa impian Anda!</p>
                     @auth
                         <a href="{{ route('listings.create') }}" 
-                           wire:navigate 
-                           class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm transition">
+                        wire:navigate 
+                        class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm transition">
                             + Buat Lelang Baru
                         </a>
                     @endauth
