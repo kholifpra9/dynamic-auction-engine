@@ -4,6 +4,7 @@ use Livewire\Volt\Component;
 use App\Models\Listing;
 use App\Models\Category;
 use Livewire\WithPagination;
+use Illuminate\Support\Facades\Storage;
 
 new class extends Component {
     use WithPagination;
@@ -69,8 +70,8 @@ new class extends Component {
                 
                 {{-- Image & Badges Container --}}
                 <div class="relative w-full h-52 bg-gray-100 overflow-hidden">
-                    @if ($listing->photo_path && Storage::exists($listing->photo_path))
-                        <img src="{{ Storage::url($listing->photo_path) }}" 
+                    @if ($listing->photo_path && Storage::disk('public')->exists($listing->photo_path))
+                        <img src="{{ asset('storage/' . $listing->photo_path) }}"
                              alt="{{ $listing->title }}" 
                              onerror="this.onerror=null; this.remove(); this.nextElementSibling.classList.remove('hidden');"
                              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">

@@ -1,6 +1,7 @@
 <?php
 
 use Livewire\Volt\Component;
+use Illuminate\Support\Facades\Storage;
 
 new class extends Component {
     public function getListingsProperty()
@@ -37,7 +38,7 @@ new class extends Component {
             
             {{-- Image & Badges Container --}}
             <div class="relative w-full h-52 bg-gray-100 overflow-hidden">
-                @if ($listing->photo_path && Storage::exists($listing->photo_path))
+                @if ($listing->photo_path && Storage::disk('public')->exists($listing->photo_path))
                     <img src="{{ Storage::url($listing->photo_path) }}" 
                          alt="{{ $listing->title }}" 
                          onerror="this.onerror=null; this.remove(); this.nextElementSibling.classList.remove('hidden');"

@@ -3,6 +3,7 @@
 use Livewire\Volt\Component;
 use App\Models\Listing;
 use App\Actions\PlaceBidAction;
+use Illuminate\Support\Facades\Storage;
 
 new class extends Component {
     public Listing $listing;
@@ -79,7 +80,7 @@ new class extends Component {
             <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
                 {{-- Media Header --}}
                 <div class="relative w-full h-80 sm:h-96 bg-gray-100">
-                    @if ($listing->photo_path && Storage::exists($listing->photo_path))
+                    @if ($listing->photo_path && Storage::disk('public')->exists($listing->photo_path))
                         <img src="{{ Storage::url($listing->photo_path) }}" 
                              alt="{{ $listing->title }}" 
                              onerror="this.onerror=null; this.remove(); this.nextElementSibling.classList.remove('hidden');"

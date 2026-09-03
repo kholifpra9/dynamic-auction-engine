@@ -1,5 +1,4 @@
-<div {{ $attributes->merge(['class' => 'flex items-center gap-2.5']) }}>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
         <defs>
             <!-- Background Gradient Indigo -->
             <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -26,8 +25,3 @@
         <!-- Live/Dynamic Signal Node (Highest Bid Point) -->
         <circle cx="98" cy="30" r="7" fill="url(#cyanGrad)" />
     </svg>
-
-        <span class="font-extrabold text-xl tracking-tight text-gray-900 dark:text-white">
-            Ku<span class="text-indigo-600 dark:text-indigo-400">Lelang</span>
-        </span>
-</div>
