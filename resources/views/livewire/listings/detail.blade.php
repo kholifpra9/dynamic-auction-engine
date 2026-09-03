@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\CloseAuctionAction;
 use Livewire\Volt\Component;
 use App\Models\Listing;
 use App\Actions\PlaceBidAction;
@@ -10,14 +11,18 @@ new class extends Component {
     public $bidAmount = '';
     public $errorMessage = '';
 
+    private function closeIfExpired(): void
+    {
+        if ($this->listing->status === 'active' && $this->listing->auction_end->isPast()) {
+            app(CloseAuctionAction::class)->execute($this->listing);
+        }
+    }
+
     public function mount(Listing $listing)
     {
         $this->listing = $listing->load(['category', 'seller', 'bids.bidder']);
-
-        if ($this->listing->status === 'active' && $this->listing->auction_end->isPast()) {
-            app(\App\Actions\CloseAuctionAction::class)->execute($this->listing);
-            $this->listing->refresh();
-        }
+        $this->closeIfExpired();
+        $this->listing->refresh();
     }
 
     public function getMinimumBidProperty(): float
@@ -44,6 +49,8 @@ new class extends Component {
             $this->listing->load('bids.bidder');
             $this->bidAmount = '';
 
+            $this->dispatch('notify', type: 'success', message: 'Tawaran berhasil diajukan!');
+
         } catch (RuntimeException $e) {
             $this->errorMessage = $e->getMessage();
         }
@@ -58,8 +65,15 @@ new class extends Component {
 
     public function refreshListing()
     {
+        $wasActive = $this->listing->status === 'active';
+        
+        $this->closeIfExpired();
         $this->listing->refresh();
         $this->listing->load('bids.bidder');
+
+        if ($wasActive && $this->listing->status === 'ended') {
+            $this->dispatch('notify', type: 'warning', message: 'Lelang telah berakhir.');
+        }
     }
 }; ?>
 

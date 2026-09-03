@@ -67,6 +67,8 @@ new class extends Component {
             'status' => 'active',
         ]);
 
+        session()->flash('toast', ['type' => 'success', 'message' => 'Lelang berhasil dibuat!']);
+
         return redirect()->route('my-auctions');
     }
 

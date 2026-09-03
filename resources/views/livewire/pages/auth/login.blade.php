@@ -20,6 +20,8 @@ new #[Layout('layouts.guest')] class extends Component
 
         Session::regenerate();
 
+        session()->flash('toast', ['type' => 'success', 'message' => 'Berhasil login!']);
+
         $this->redirectIntended(default: route('home', absolute: false), navigate: true);
     }
 }; ?>

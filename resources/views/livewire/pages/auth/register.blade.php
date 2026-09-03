@@ -32,6 +32,8 @@ new #[Layout('layouts.guest')] class extends Component
 
         Auth::login($user);
 
+        session()->flash('toast', ['type' => 'success', 'message' => 'Registrasi berhasil, selamat datang!']);
+
         $this->redirect(route('home', absolute: false), navigate: true);
     }
 }; ?>

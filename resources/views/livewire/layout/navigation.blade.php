@@ -12,6 +12,8 @@ new class extends Component
     {
         $logout();
 
+        session()->flash('toast', ['type' => 'success', 'message' => 'Logout Berhasil, selamat Jumpa!']);
+
         $this->redirect('/', navigate: true);
     }
 }; ?>
