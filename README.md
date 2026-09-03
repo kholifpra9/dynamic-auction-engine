@@ -141,12 +141,25 @@ php artisan schedule:work
 ```
 
 ### Testing manual mempercepat waktu lelang (untuk demo/skenario uji)
-Karena durasi lelang bisa mencapai belasan menit, untuk keperluan demo/testing lebih cepat digunakan `php artisan tinker` (REPL interaktif bawaan Laravel) untuk memundurkan `auction_end` secara manual tanpa perlu menunggu waktu asli habis:
+
+Karena durasi lelang bisa mencapai belasan menit (bahkan bisa lebih panjang tergantung input seller), disediakan command khusus testing/demo untuk mempercepat listing tanpa perlu menunggu waktu asli habis: `app/Console/Commands/SpeedUpAllAuctions.php`.
+
+**Mempercepat SEMUA listing yang masih aktif** agar tersisa N detik (default 30 detik):
+```bash
+php artisan auctions:speed-up-all
+```
+Atau dengan durasi custom, misal tersisa 10 detik:
+```bash
+php artisan auctions:speed-up-all 10
+```
+Setelah dijalankan, buka halaman `/listings` atau `/listings/{id}` — countdown akan berjalan mundur secara live dari sisa waktu yang ditentukan, lalu otomatis menutup dan menentukan pemenang begitu mencapai nol (tanpa refresh manual), berkat kombinasi Alpine countdown + lazy-close yang sudah dijelaskan di atas.
+
+**Alternatif — mempercepat satu listing tertentu lewat Tinker** (kalau butuh kontrol manual ke listing spesifik):
 ```bash
 php artisan tinker
 ```
 ```php
-$listing = \App\Models\Listing::first();
+$listing = \App\Models\Listing::find($id); // ganti $id sesuai listing yang dituju
 $listing->update(['auction_end' => now()->subMinute()]);
 exit
 ```
@@ -154,7 +167,8 @@ Lalu jalankan command penutup lelang secara manual (tanpa menunggu giliran sched
 ```bash
 php artisan auctions:close-expired
 ```
-Tinker dan pemanggilan manual command ini murni alat bantu development/testing — tidak digunakan oleh alur aplikasi yang sebenarnya (di production, command berjalan otomatis lewat scheduler).
+
+Command dan Tinker ini murni alat bantu development/testing — tidak digunakan oleh alur aplikasi yang sebenarnya (di production, penutupan lelang berjalan otomatis lewat scheduler setiap menit).
 
 ---
 
@@ -189,7 +203,7 @@ php artisan test
 ---
 
 ## Asumsi
-- Durasi lelang ditentukan bebas oleh seller saat membuat listing.
+- Durasi lelang ditentukan bebas oleh seller saat membuat listing (dalam menit).
 - Kenaikan minimum bid ditetapkan 5% dari harga saat ini (bukan nominal tetap), agar proporsional di berbagai rentang harga.
 - Verifikasi email tidak diaktifkan, sesuai ketentuan soal.
 - Satu akun bisa berperan sebagai seller maupun bidder tanpa sistem role terpisah.
